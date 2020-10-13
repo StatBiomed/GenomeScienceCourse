@@ -1,0 +1,361 @@
+# Assignment 1 for Genome Science (BBMS3009)
+This assignment aims to understand the normalization of RNA-seq count data and the basics of the statistical tests behind Differential Gene expression detection.
+
+**Top note**
+
+You can run this notebook on one of these three options
+1. colab cloud computing by using [this link](https://colab.fan/StatBiomed/GenomeScienceCourse/assignments/Assignment1_BBMS3009.ipynb) (suggested)
+2. local R studio (use the [Assignment1_BBMS3009.Rmd](./Assignment1_BBMS3009.Rmd) notebook) 
+3. local jupyter lab with R environment via conda (multiple steps required).
+
+**Running time**
+
+* `DESeq2` installation: ~10min
+* Running the whole notebook: ~5min
+
+**Main reference**:
+* [Chapter 8 in Modern Statistics for Modern Biology](https://web.stanford.edu/class/bios221/book/Chap-CountData.html)
+* [Chapter 8 in Computational Genomics with R](http://compgenomr.github.io/book/rnaseqanalysis.html)
+
+## Part 0. Environment setting
+Installing the DESeq2 package for loading data (only need once)
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("DESeq2")
+```
+
+## Part 1. Load data
+
+#### Load count matrix
+gene-by-sample, with additional column for gene length
+
+```{r}
+counts_url <- 'https://raw.github.com/compgenomr/compGenomRData/master/inst/extdata/rna-seq/SRP029880.raw_counts.tsv'
+
+counts <- as.matrix(read.csv(counts_url, header = T, sep = '\t'))
+```
+
+```{r}
+dim(counts)
+colnames(counts)
+```
+
+```{r}
+summary(counts[,1:3])
+```
+
+#### Load colData for sample information
+
+```{r}
+coldata_url <- 'https://raw.github.com/compgenomr/compGenomRData/master/inst/extdata/rna-seq/SRP029880.colData.tsv'
+
+col_data <- read.table(coldata_url, header = T, sep = '\t', stringsAsFactors = TRUE)
+```
+
+```{r}
+col_data
+```
+
+## 2. Normalization
+For gene length bias correction, is often included in the "normalization" term.
+
+### 2.1 CPM: Count per million
+Normalization to the library size
+
+```{r}
+cpm <- t(t(counts[, 1:10]) / colSums(counts[, 1:10])) * 10^6
+```
+
+```{r}
+head(cpm)
+```
+
+```{r}
+hist(log(cpm[, 10] + 0.1), breaks=seq(-3, 11, 0.5))
+```
+
+### 2.2 RPKM: Read per killobase per million
+Correction the gene length bias. It also often contained in the normalization term
+
+```{r}
+geneLengths <- counts[, 11]
+head(geneLengths)
+```
+
+```{r}
+rpkm <- cpm / geneLengths * 10^3
+```
+
+```{r}
+head(rpkm)
+```
+
+```{r}
+# smoothScatter(log10(geneLengths + 0.1), log10(cpm[, 10] + 0.1))
+```
+
+```{r}
+hist(log(rpkm[, 10] + 0.1), breaks=seq(-3, 11, 0.5))
+```
+
+### 2.3 TPM: transcript per million
+
+```{r}
+tpm <- t(t(rpkm) / colSums(rpkm)) * 10^6
+```
+
+```{r}
+head(tpm)
+```
+
+```{r}
+plot(log10(rpkm[, 10] + 0.1), log10(tpm[, 10] + 0.1))
+```
+
+<font color='red'>**Q1: Define CPM, TPM and RPKM, and describe their difference?**</font>
+
+## 3. Differential gene expression
+
+```{r}
+library(DESeq2)
+library(stats)
+library(ggplot2)
+```
+
+```{r}
+#define the design formula
+designFormula <- "~ group"
+
+#create a DESeq dataset object from the count matrix and the colData 
+dds <- DESeqDataSetFromMatrix(countData = counts[, 1:10], 
+                              colData = col_data, 
+                              design = as.formula(designFormula))
+                              
+#print dds object to see the contents
+print(dds)
+```
+
+```{r}
+size_factor <- DESeq2::estimateSizeFactorsForMatrix(dds@assays@data$counts)
+total_reads <- colSums(dds@assays@data$counts)
+
+# plot(total_reads, size_factor)
+df <- data.frame(size_factor=size_factor, total_reads=total_reads)
+
+ggplot(df, aes(x=total_reads, y=size_factor)) + 
+  geom_point(size=5)+
+  geom_smooth(method=lm, color="black")
+```
+
+<font color='red'>**Q2: What is the relationship between the learned size factor and total reads?**</font>
+
+Hints: see the [Fig. 8.1](https://web.stanford.edu/class/bios221/book/Chap-CountData.html#fig:rnaseq-normalization) in the book 
+[Modern Statistics for Modern Biology](https://web.stanford.edu/class/bios221/book/Chap-CountData.html).
+
+#### Remove lowly expressed genes
+This step can reduce the number of tests, but be careful as some informative genes may indeed have low expression
+
+Here, we only remove genes with no expression at all
+
+```{r}
+#For each gene, we count the total number of reads for that gene in all samples 
+#and remove those that don't have at least 1 read. 
+
+dds <- dds[ rowSums(dds@assays@data$counts) > 1, ]
+dim(dds)
+```
+
+```{r}
+sum(rowSums(dds@assays@data$counts) > 1)
+```
+
+### 3.1 Perform DE analysis
+
+```{r}
+dds <- DESeq(dds)
+```
+
+```{r}
+#compute the contrast for the 'group' variable where 'CTRL' 
+#samples are used as the control group. 
+
+DEresults = results(dds, contrast = c("group", 'CASE', 'CTRL'))
+
+#sort results by increasing p-value
+DEresults <- as.data.frame(DEresults[order(DEresults$pvalue), ])
+```
+
+```{r}
+#shows the top results
+head(DEresults)
+```
+
+#### Visualize the DE results
+plotting the MA plot
+
+```{r}
+DESeq2::plotMA(object = dds, ylim = c(-5, 5))
+```
+
+Plotting the distribution of p values
+
+```{r}
+ggplot(data = DEresults, aes(x = pvalue)) + 
+  geom_histogram(bins = 100)
+```
+
+<font color='red'>**Q3: If there is no genuine differentially expressed genes, what distribution of p values do you expected to see? Is there any range of the p value matching this expectation?**</font>
+
+#### Check the ajusted p values
+By default, p values are are adjusted by [Benjamini-Hochberg method, i.e., FDR](https://en.wikipedia.org/wiki/False_discovery_rate)
+
+```{r}
+ggplot(data = DEresults, aes(x = log10(padj/pvalue))) + 
+  geom_histogram(bins = 30)
+```
+
+### 3.2 Compare to likelihood ratio test
+In DESeq2, generalised linear model is used for DE gene detection, and there are two main tests to perform:
+1. Wald test (default): estimating the mean and variance of the effect size, and then calculate the p value by Gaussian distribution. Null hypothesis: effect size is zero
+2. Likelihood ratio test (taught in lecture): compare the likelihood ratio between two models: with vs without the candidate covariate, and then calculate the p value by Chi-square distribution. Null hypothesis: the likelihood between these two model are the same (or not very different).
+
+```{r}
+dds_LRT <- nbinomLRT(dds, reduced=as.formula('~ 1'))
+```
+
+```{r}
+df <- data.frame(Wald_pval = rowData(dds)$WaldPvalue_group_CTRL_vs_CASE,
+                 LRT_pval = rowData(dds_LRT)$LRTPvalue)
+
+ggplot(df, aes(x = -log10(Wald_pval), y= -log10(LRT_pval))) + 
+  geom_point() + geom_abline(intercept = 0, slope = 1)
+```
+
+<font color='red'>**Q4: What the difference did you see by comparing the p values between these two different tests?**</font>
+
+Hints: consider sensitivity and potential false positives
+
+### 3.3 Multiple factors
+
+The original column data
+
+```{r}
+col_data
+```
+
+#### Additional factor
+As an illustration, we introduce an madeup factor. We assume that the CASE_1, CASE_2 and CTRL_1, CTRL_2 are one setting, e.g., (paired-end), and the other based on another setting, e.g., (single-end). 
+
+Now we want to consider the variations that comes from this additional factor, and how it affects the differential expression between normal and cancer
+
+```{r}
+col_data_2f <- col_data
+col_data_2f$type <- c(1, 1, 0, 0, 0, 1, 1, 0, 0, 0)
+col_data_2f
+```
+
+```{r}
+#define the design formula
+designFormula <- "~ group + type"
+
+#create a DESeq dataset object from the count matrix and the colData 
+ddsTwoFactor <- DESeqDataSetFromMatrix(countData = counts[, 1:10], 
+                                       colData = col_data_2f, 
+                                       design = as.formula(designFormula))
+                              
+# Remove unexpressed genes
+ddsTwoFactor <- ddsTwoFactor[ rowSums(ddsTwoFactor@assays@data$counts) > 1, ]
+
+#print dds object to see the contents
+print(ddsTwoFactor)
+```
+
+```{r}
+ddsTwoFactor <- DESeq(ddsTwoFactor)
+```
+
+```{r}
+ddsTwoFactor_LRT <- nbinomLRT(ddsTwoFactor, reduced=as.formula('~ type'))
+```
+
+```{r}
+df <- data.frame(One_factor_pval = rowData(dds_LRT)$LRTPvalue,
+                 Two_factor_pval = rowData(ddsTwoFactor_LRT)$LRTPvalue)
+
+ggplot(df, aes(x = -log10(One_factor_pval), y= -log10(Two_factor_pval))) + 
+  geom_point() + geom_abline(intercept = 0, slope = 1)
+```
+
+<font color='red'>**Q5: What is the difference between p values when considering additional variable? What is the possible reason?**</font>
+
+Hints: consider the source of the variations
+
+## 4. Gene set analysis (this section is optional)
+
+### Get DE genes
+
+```{r}
+#compute the contrast for the 'group' variable where 'CTRL' 
+#samples are used as the control group. 
+
+DE_res = results(dds_LRT, contrast = c("group", 'CASE', 'CTRL'))
+
+#sort results by increasing p-value
+DE_res <- as.data.frame(DE_res[order(DE_res$pvalue), ])
+```
+
+```{r}
+#remove genes with NA values 
+DE_genes <- DE_res[!is.na(DE_res$padj), ]
+
+#select genes with adjusted p-values below 0.1
+DE_genes <- DE_genes[DE_genes$padj < 0.05, ]
+
+#select genes with absolute log2 fold change above 1 (two-fold change)
+DE_genes <- DE_genes[abs(DE_genes$log2FoldChange) > 1, ]
+```
+
+```{r}
+head(DE_genes)
+dim(DE_genes)
+```
+
+### GO enrichment analysis
+
+In a typical differential expression analysis, thousands of genes are found differentially expressed between two groups of samples. Besides exploring individual gens, we can also calculate the overlap between DE genes and annotated gene sets for function assocation, e.g., Gene Ontology (GO) terms.
+
+You could copy the above 3885 DE genes into the web server, e.g., [GO website](http://geneontology.org) or [David web server](https://david.ncifcrf.gov/).
+
+Here, we show how to use R package `gProfileR` to perform this overlap enrichment analyis.
+
+```{r}
+# Only need install once
+
+install.packages('gProfileR')
+```
+
+```{r}
+library(gProfileR)
+```
+
+```{r}
+#get the list of genes of interest
+genesOfInterest <- rownames(DE_genes)
+
+#calculate enriched GO terms
+goResults <- gprofiler(query = genesOfInterest, 
+                     organism = 'hsapiens', 
+                     src_filter = 'GO', 
+                     hier_filtering = 'moderate')
+```
+
+```{r}
+col_show <- c('p.value', 'term.size', 'query.size', 'overlap.size', 'term.name')
+head(goResults[order(goResults$p.value), col_show], 10)
+```
+
+```{r}
+```
