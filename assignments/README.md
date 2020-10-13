@@ -10,7 +10,7 @@ You can run this notebook on one of these three options and
 
 You are strongly suggested to run the scripts yourself. If you still have 
 difficulty to run it, you can view the noetbook with results 
-[here](https://nbviewer.jupyter.org/github/StatBiomed/GenomeScienceCourse/assignments/Assignment1_BBMS3009.ipynb), and then
+[here](https://nbviewer.jupyter.org/github/StatBiomed/GenomeScienceCourse/blob/master/assignments/Assignment1_BBMS3009.ipynb), and then
 **answer the four questions in a report**.
 
 
