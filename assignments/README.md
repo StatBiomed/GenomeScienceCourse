@@ -3,7 +3,7 @@
 ## Assignment list
 ### Assignment 1
 You can run this notebook on one of these three options and
-**answer the four questions in a report**:
+**answer the five questions in a report**:
 1. colab cloud computing by using [Assignment1_BBMS3009.ipynb](./Assignment1_BBMS3009.ipynb) notebook), you can click [this link](https://colab.fan/StatBiomed/GenomeScienceCourse/assignments/Assignment1_BBMS3009.ipynb) (suggested)
 2. local R studio (use the [Assignment1_BBMS3009.Rmd](./Assignment1_BBMS3009.Rmd) notebook) 
 3. local jupyter lab with R environment via conda (multiple steps required).
@@ -11,7 +11,7 @@ You can run this notebook on one of these three options and
 You are strongly suggested to run the scripts yourself. If you still have 
 difficulty to run it, you can view the noetbook with results 
 [here](https://nbviewer.jupyter.org/github/StatBiomed/GenomeScienceCourse/blob/master/assignments/Assignment1_BBMS3009.ipynb), and then
-**answer the four questions in a report**.
+**answer the five questions in a report**.
 
 
 ## Colab intro from Google research
