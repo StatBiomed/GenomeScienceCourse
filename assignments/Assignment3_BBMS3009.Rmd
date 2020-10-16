@@ -1,11 +1,11 @@
-# Assignment 1 for Genome Science (BBMS3009)
+# Assignment 3 for Genome Science (BBMS3009)
 This assignment aims to understand the normalization of RNA-seq count data and the basics of the statistical tests behind Differential Gene expression detection.
 
 **Top note**
 
 You can run this notebook on one of these three options
-1. colab cloud computing by using [this link](https://colab.fan/StatBiomed/GenomeScienceCourse/assignments/Assignment1_BBMS3009.ipynb) (suggested)
-2. local R studio (use the [Assignment1_BBMS3009.Rmd](./Assignment1_BBMS3009.Rmd) notebook) 
+1. colab cloud computing by using [this link](https://colab.fan/StatBiomed/GenomeScienceCourse/assignments/Assignment3_BBMS3009.ipynb) (suggested)
+2. local R studio (use the [Assignment3_BBMS3009.Rmd](./Assignment3_BBMS3009.Rmd) notebook) 
 3. local jupyter lab with R environment via conda (multiple steps required).
 
 **Running time**
